@@ -2,7 +2,7 @@
 #include<iostream>
 using namespace std;
 #define SWAP_V(x, y) {cellvertex* v = y; y = x; x = v;}
-#define EPSILON 0.00001f
+//#define EPSILON 0.00001f
 
 GLfloat ABS(GLfloat x)
 {

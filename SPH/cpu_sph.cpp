@@ -6,8 +6,7 @@
 #include "cpu_sph.h"    
 
 
-//#define RADIUS 0.03f    
-#define EPSILON 0.00001f    
+//#define RADIUS 0.03f     
 const float PI = 3.1415926535f;
 
 #define POS(i) sph->pos[i]    
@@ -107,7 +106,7 @@ void cpu_sph_transform_obstacles(cpu_sph* sph, const matrix4* m)//根据障碍物信息
 	mat4_invert(&sph->mat_inv_col, &sph->mat_col);
 }
 
-void cpu_sph_transform_obstacles(SPHSystem* sph, const matrix4* m)//根据障碍物信息，更新粒子的位置    
+void cpu_sph_transform_obstacles(SPHNewSystem* sph, const matrix4* m)//根据障碍物信息，更新粒子的位置    
 {
 	mat4_mul(&sph->mat_col, m, &sph->mat_col);
 	mat4_invert(&sph->mat_inv_col, &sph->mat_col);

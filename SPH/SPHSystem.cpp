@@ -3,18 +3,91 @@
 #include "MyfileRW.h"
 #include <string>
 using std::string;
-#define PARTICLE(i) SPHSystem::getinstance()->GetFluid()->GetParticleByIndex(i) 
-#define GETNUM() SPHSystem::getinstance()->GetFluid()->GetParticleNum()
+#define PARTICLE(i) SPHNewSystem::getinstance()->GetFluid()->GetParticleByIndex(i) 
+#define GETNUM() SPHNewSystem::getinstance()->GetFluid()->GetParticleNum()
 
-SPHSystem::SPHSystem()
+void SPHNewSystem::init()
+{
+	int i;
+	int x;
+	int y;
+	int z;
+	float s;
+	float s2;
+	float cx;
+	float cy;
+	float cz;
+
+	s = 0.006f;
+	cx = cy = 0.0f;
+	cz = 0.05f;
+
+	s2 = 0.001f;
+	//³õÊ¼»¯Á÷Ìå,Á÷ÌåÖÐN_PARTICLES¸öÁ£×Ó£¬Á£×ÓÓÐNUM_PHASEÏà
+
+	//±£Áô¹¦ÄÜµÄÊ±ºò£¬ÕâÀï¼ÇµÃÊÍ·Å¿Õ¼ä£¬ÔÝÊ±»¹Ã»ÓÐÊÍ·Å¿Õ¼ä
+	Fluid *input = new Fluid(N_PARTICLES, NUM_PHASE);
+
+#ifdef FILEINPUT
+	//test io
+	MyFileRW::getinstance()->SetReadNmae("./Data/input.txt");//SetNameºÍcloseÒª³É¶Ô³öÏÖ
+	MyFileRW::getinstance()->ReadFile(input);
+	MyFileRW::getinstance()->CloseReadFile();
+#else
+	for (x = 0; x < CUBE_LEN_X; x++)
+	{
+		for (y = 0; y < CUBE_LEN_Y; y++)
+		{
+			for (z = 0; z < LEN_Z; z++)
+			{
+				i = x + y*CUBE_LEN_X + z*CUBE_LEN_X*CUBE_LEN_Y;
+				if (input->m_ParticleVector.size() < i)
+					continue;
+				//ÉèÖÃÎ»ÖÃ
+				//vec3_set(&(input->GetParticleByIndex(i)->pos), s*(x - CUBE_LEN_X / 2) - cx, s*(y - CUBE_LEN_Y / 2) - cy, 0.8*s*z - cz + 0.1f);
+				vec3_set(&(input->GetParticleByIndex(i)->pos), s*(x - CUBE_LEN_X / 2) - cx, s*(y - CUBE_LEN_Y / 2) - cy, s*z - cz);
+				//ÉèÖÃËÙ¶È
+				vec3_set(&(input->GetParticleByIndex(i)->vel), 0.0f, 0.0f, 0.0f);
+				input->GetParticleByIndex(i)->vel_half = input->GetParticleByIndex(i)->vel;
+				input->GetParticleByIndex(i)->SetstaticDensity(STATICDENSITY);
+				//ÒÔxÖáÎª·Ö½ç£¬xÈ¡ÕýÎªºìÉ«£¬xÈ¡¸ºÎªÀ¶É«
+				if (x >= CUBE_LEN_X / 2)
+				{
+					//ÉèÖÃÌå»ý·ÖÊý
+					input->GetParticleByIndex(i)->A_k[0] = (1.0f);//ÉèÁ¢Ìå»ý·ÖÊý£¬µÚÒ»ÏîÎª1
+					input->GetParticleByIndex(i)->A_k[1] = (0.0f);//µÚ¶þÏîÎª0
+																  //ÉèÖÃÖÊÁ¿·ÖÊý
+					input->GetParticleByIndex(i)->C_k[0] = (1.0f);//ÉèÁ¢Ìå»ý·ÖÊý£¬µÚÒ»ÏîÎª1
+					input->GetParticleByIndex(i)->C_k[1] = (0.0f);//µÚ¶þÏîÎª0
+				}
+				else
+				{
+					input->GetParticleByIndex(i)->A_k[0] = (0.0f);//ÉèÁ¢Ìå»ý·ÖÊý£¬µÚÒ»ÏîÎª0
+					input->GetParticleByIndex(i)->A_k[1] = (1.0f);//µÚ¶þÏîÎª1
+
+					input->GetParticleByIndex(i)->C_k[0] = (0.0f);//ÉèÁ¢Ìå»ý·ÖÊý£¬µÚÒ»ÏîÎª0
+					input->GetParticleByIndex(i)->C_k[1] = (1.0f);//µÚ¶þÏîÎª1
+				}
+				//ÉèÖÃÃ¿¸öÁ£×ÓµÄÖÊÁ¿
+				input->GetParticleByIndex(i)->SetMass(MASS);
+				//ÉèÖÃÕ³¶È
+				input->GetParticleByIndex(i)->SetViscosity(VISCOSITY);
+			}
+		}
+	}
+#endif
+	SPHNewSystem::getinstance()->SetFluid(input);
+	SPHNewSystem::getinstance()->SetParam(SMOOTHING_LENGTH, TIMESTEP, STIFF, SEARCH_RADIUS);
+}
+
+SPHNewSystem::SPHNewSystem()
 {
 	m_fluid = NULL;
 	mat4_set_identity(&mat_col);//°Ñ²ÎÊýÄÚÈÝÖÃ0    
-	m_Calculate = new Calculate;
-	m_SingleCal = new SingleCal;
+	m_Calculate = new Calculate_Reverce;
 }
 
-void SPHSystem::SetParam(float b, float c, float d, float f)
+void SPHNewSystem::SetParam(float b, float c, float d, float f)
 {
 	m_Smoothlen = b;
 	m_Timestep = c;
@@ -24,20 +97,17 @@ void SPHSystem::SetParam(float b, float c, float d, float f)
 	if (m_Calculate)
 		m_Calculate->setH(m_Smoothlen);
 
-	if (m_SingleCal)
-		m_SingleCal->setH(m_Smoothlen);
-
 	grid.SetGrid_len(m_R_Search);
 }
 
-void SPHSystem::CreateNighbourList()
+void SPHNewSystem::CreateNighbourList()
 {
 	n_list.SetSize(m_fluid->GetParticleNum());//Ïàµ±ÓÚ³õÊ¼»¯ÁÚ½Ó±í£¬ÀïÃæÓÐÇå³ý²Ù×÷
 	grid.CreateGrid(*m_fluid);//´ÓÁ÷ÌåÖÐ´´½¨Íø¸ñ
 	GridToNeighbour();//´ÓÍø¸ñÖÐ´´½¨ÁÚ½Ó±í
 }
 
-void SPHSystem::GridToNeighbour()
+void SPHNewSystem::GridToNeighbour()
 {
 	int gx;
 	int gy;
@@ -46,10 +116,11 @@ void SPHSystem::GridToNeighbour()
 	int neighbour_grid;
 	for (int i = 0; i < n_list.m_sizes; i++)
 	{
-		//sph_neighbour temp;
-		//temp.index = i;
-		//temp.distsq = 0.0f;
-		//n_list.p[i].push_back(temp);//³õÊ¼»¯µÚÒ»¸öÁ£×ÓÎª×Ô¼º±¾Éí
+		sph_neighbour temp;
+		temp.index = i;
+		temp.distsq = 0.0f;
+		n_list.p[i].clear();//Ê¹ÓÃÇ°ÏÈÇå¿Õ
+		n_list.p[i].push_back(temp);//³õÊ¼»¯µÚÒ»¸öÁ£×ÓÎª×Ô¼º±¾Éí
 
 		gx = (int)((m_fluid->GetParticleByIndex(i)->pos.x - grid.minx) / grid.grid_len);
 		gy = (int)((m_fluid->GetParticleByIndex(i)->pos.y - grid.miny) / grid.grid_len);
@@ -70,7 +141,8 @@ void SPHSystem::GridToNeighbour()
 						float dis;
 						int pindex = grid.particles[neighbour_grid][j];
 						dis = vec3_distsq(GetParticlePosByIndex(i), GetParticlePosByIndex(pindex));
-
+						if(pindex==i)
+							continue;
 						if (dis < m_R_Search*m_R_Search)
 						{
 							sph_neighbour temp1;
@@ -80,47 +152,40 @@ void SPHSystem::GridToNeighbour()
 						}
 					}
 				}
-
-		//grid.particles[gindex].push_back(i);//Õâ¾äÓÐµãÆæ¹Ö,ÏÈ×¢ÊÍµô£¬Ç°ÃæÒÑ¾­Ìí¼Ó¹ýÁË
+		grid.particles[gindex].push_back(i);
 	}
 }
 
-void SPHSystem::CalSphOneStep()
+void SPHNewSystem::CalSphOneStep()
 {
-	CreateNighbourList();//¼ÆËãÇ°ÏÈ´´½¨ÁÚ½Ó±í
-	if (m_Calculate)
+	//ÖØÐÂ°´ÕÕÔ­À´µÄÑ­»··½Ê½ºÍÍø¸ñ¹¹ÔìÄ£Ê½
+	for (int i = 0;i < N_STEPS;i++)
 	{
-		m_Calculate->AddFrame();
-		m_Calculate->CalPressure(*SPHSystem::getinstance());
-		m_Calculate->CalDriftVel(*SPHSystem::getinstance());
-		m_Calculate->CalFraction(*SPHSystem::getinstance());
-		m_Calculate->CalForce(*SPHSystem::getinstance());
-		m_Calculate->CalCollision(*SPHSystem::getinstance());
-		m_Calculate->CalPosition(*SPHSystem::getinstance());
+		if (i == 0)
+			CreateNighbourList();//¼ÆËãÇ°ÏÈ´´½¨ÁÚ½Ó±í
+
+		if (m_Calculate)
+		{
+			m_Calculate->AddFrame();
+
+			m_Calculate->CalPressure(*SPHNewSystem::getinstance(), i);
+			m_Calculate->CalDriftVel(*SPHNewSystem::getinstance());
+			m_Calculate->CalFraction(*SPHNewSystem::getinstance());
+			m_Calculate->CalForce(*SPHNewSystem::getinstance());
+			m_Calculate->CalCollision(*SPHNewSystem::getinstance());
+			m_Calculate->CalPosition(*SPHNewSystem::getinstance());
+		}
 	}
 }
 
-void SPHSystem::CalSphforsinglemodel()
-{
-	CreateNighbourList();//¼ÆËãÇ°ÏÈ´´½¨ÁÚ½Ó±í
-	if (m_SingleCal)
-	{
-		m_SingleCal->AddFrame();
-		m_SingleCal->CalPressure(*SPHSystem::getinstance());
-		m_SingleCal->CalForce(*SPHSystem::getinstance());
-		m_SingleCal->CalCollision(*SPHSystem::getinstance());
-		m_SingleCal->CalPosition(*SPHSystem::getinstance());
-	}
-}
-
-vector3* SPHSystem::GetParticlePosByIndex(int num)
+vector3* SPHNewSystem::GetParticlePosByIndex(int num)
 {
 	if (!m_fluid)
 		return NULL;
 	return &(m_fluid->GetParticleByIndex(num)->pos);
 }
 
-SPHSystem::~SPHSystem()
+SPHNewSystem::~SPHNewSystem()
 {
 	if (m_fluid)
 	{
@@ -128,7 +193,7 @@ SPHSystem::~SPHSystem()
 	}
 }
 
-Calculate::Calculate()
+Calculate_Reverce::Calculate_Reverce()
 {
 	poly6_coef = 0.0f;
 	grad_poly6_coef = 0.0f;
@@ -139,268 +204,155 @@ Calculate::Calculate()
 	sigma = 0.0001f;
 	_Frame = 0;
 }
-
-void Calculate::CalPressure(SPHSystem &sph)
+//½ñÌìµÄÄ¿±êµ¥ÏàÄ£ÐÍÖØÐ´Ò»±é
+void Calculate_Reverce::CalPressure(SPHNewSystem &sph, int whattime)
 {
-	Fluid *temp = sph.GetFluid();
-	if (!temp)
+	//Çå¿ÕÃÜ¶ÈÖØÐÂ¼ÆËã
+	for (int i = 0;i < GETNUM();i++)
 	{
-		cout << "CalPressure Fluid is NULL." << endl;
-		return;
+		PARTICLE(i)->density = 0;
 	}
-	for (int i = 0; i < temp->GetParticleNum(); i++)
+	float h2 = sph.GetH2();
+	if (whattime == 0)//±íÊ¾µÚÒ»´Î
 	{
-		float density = 0.0f;
-		for (int j = 0; j < sph.n_list.p[i].size(); j++)
+		for (int i = 0;i < GETNUM();i++)
 		{
-			int j_Index = sph.n_list.p[i][j].index;
-			//¼ÆËãÃÜ¶È¹«Ê½(22)
-			density += SPH_function(*temp->GetParticleByIndex(i), *temp->GetParticleByIndex(j_Index), 1.0);
-		}
-		PARTICLE(i)->density = density;//»ñµÃÃ¿¸öÁ£×ÓµÄÃÜ¶ÈÆ½¾ù
-
-		//ÓëÔ­ÎÄ²»·ûµÄµØ·½£º´ÓÃÜ¶È¼ÆËãµ¥¸öÁ£×ÓµÄ»ìºÏÑ¹Á¦£¨24£©,Ã»ÓÐÓÃµ÷Õû¹«Ê½
-		temp->GetParticleByIndex(i)->pressure = sph.GetStiff()*(temp->GetParticleByIndex(i)->density - PARTICLE(i)->staticDensity);
-
-		for (int k = 0; k < temp->GetParticleByIndex(i)->k_phase; k++)
-		{
-			//ÖÊÁ¿·ÖÊý¸üÐÂÎªÌå»ý·ÖÊý
-			PARTICLE(i)->C_k[k] = PARTICLE(i)->A_k[k];
-			//ÓëÔ­ÎÄ²»·ûµÄµØ·½£ºÃ¿Ò»ÏîÃÜ¶È
-			temp->GetParticleByIndex(i)->Density_k[k] = temp->GetParticleByIndex(i)->density;//ÕâÀï¼ÙÉè¶¼ÎªË®·Ö×ÓÖ»ÊÇÑÕÉ«²»Í¬¶øÒÑ
-			//»ìºÏÑ¹Á¦¼ÆËãÃ¿Ò»ÏàµÄÑ¹Á¦¹«Ê½£¨12£©
-			if (temp->GetParticleByIndex(i)->P_k.size() > k)
-				temp->GetParticleByIndex(i)->P_k[k] = temp->GetParticleByIndex(i)->pressure * temp->GetParticleByIndex(i)->A_k[k];
-		}
-	}
-	//string name = "density" + to_string(_Frame) + ".txt";
-	//MyFileRW::getinstance()->SetWriteFileName(name);
-	//for (int i = 0; i < temp->GetParticleNum(); i++)
-	//{
-	//	MyFileRW::getinstance()->WriteSomething("Á£×Ó");
-	//	MyFileRW::getinstance()->WriteSomething(i);
-	//	MyFileRW::getinstance()->WriteSomething(":", 1);
-	//	MyFileRW::getinstance()->WriteSomething(PARTICLE(i)->density, 2);
-	//}
-	//MyFileRW::getinstance()->CloseWriteFile();
-	//ÇóÂÛÎÄ¹«Ê½£¨10£©µÄÇ°ÆÚ¹¤×÷
-	vector<vector3> gradient_P_m;
-	vector<vector3> gradient_T_m;
-	vector<vector3> gradient_T_Dm;
-	gradient_P_m.resize(temp->GetParticleNum());
-	gradient_T_m.resize(temp->GetParticleNum());
-	gradient_T_Dm.resize(temp->GetParticleNum());
-
-	for (int i = 0; i < temp->GetParticleNum(); i++)
-	{
-		for (int j = 0; j < sph.n_list.p[i].size(); j++)
-		{
-			int j_Index = sph.n_list.p[i][j].index;
-			vector3 dist;
-			vec3_sub(&dist, &temp->GetParticleByIndex(i)->pos, &temp->GetParticleByIndex(j_Index)->pos);
-
-			//gradient_P_m ¼ÆËã£¬¹«Ê½£¨20£©£¬ÔÙ¸ù¾Ý¹«Ê½£¨8£©£¬¶à³ýÁËÒ»¸ö»ìºÏµÄÃÜ¶È£¨¼´iµÄÃÜ¶È£©
-			gradient_P_m[i] += SPH_function_gradient(*temp->GetParticleByIndex(i), *temp->GetParticleByIndex(j_Index),
-				((temp->GetParticleByIndex(i)->pressure + temp->GetParticleByIndex(j_Index)->pressure)
-					/
-					(2.0f * temp->GetParticleByIndex(j_Index)->density * PARTICLE(i)->staticDensity))
-			);
-
-			//gradient_T_m ¼ÆËã±È½ÏÌØÊâ,µ¥¶ÀÐ´,¹«Ê½£¨21£©
-			float r = sqrtf(vec3_dot(&dist, &dist));
-			vector3 vel_dis;
-			vec3_sub(&vel_dis, &temp->GetParticleByIndex(j_Index)->vel, &temp->GetParticleByIndex(i)->vel);//×¢ÒâÎªj_Index-i
-			//ÓëÔ­ÎÄ²»·ûµÄµØ·½£ºÒòÎª¹â»¬ºËº¯ÊýÌÝ¶ÈÖÐrj-ri£¬Ô¼È¥ÁË×îºóµÄrj-ri/(rj-ri)*(rj-ri)
-			if (i != j_Index)
-				vec3_scaleadd(&gradient_T_m[i], &gradient_T_m[i],
-					-temp->GetParticleByIndex(j_Index)->mass / temp->GetParticleByIndex(j_Index)->density
-					*(temp->GetParticleByIndex(j_Index)->m_Viscosity + temp->GetParticleByIndex(j_Index)->m_Viscosity)*
-					grad_spiky_coef*(h - r)*(h - r) / r,/*ÕâÒ»ÐÐÊÇºËº¯ÊýµÄÌÝ¶ÈµÄËù´øµÄ*/
-					&vel_dis);
-
-			vector3 gradient_W_ij;
-			gradient_W_ij = vec3_scale(grad_spiky_coef*(h - r)*(h - r), &dist);
-
-			for (int k = 0; k < temp->GetParticleByIndex(i)->k_phase; k++)
+			for (int j = 0;j < sph.n_list.p[i].size();j++)
 			{
-				//×¢ÒâÕâÀïk-ÏàÃÜ¶ÈÎÒ¼ÙÉèºÍ»ìºÏÃÜ¶ÈÒ»ÑùÁË£¬¶¼ÊÇË®µÄÃÜ¶È£¬ÒÔºóÓÐÎÊÌâÐèÒª¸ÄÕâ¸ö¹«Ê½
-				//¹«Ê½£¨19£©
-				vector3 temp1(0.0f, 0.0f, 0.0f), temp2(0.0f, 0.0f, 0.0f);
-				vec3_scaleadd(&temp1, &zeros(), temp->GetParticleByIndex(i)->A_k[k] * vec3_dot(&temp->GetParticleByIndex(i)->Um_k[k], &gradient_W_ij), &temp->GetParticleByIndex(i)->Um_k[k]);
-				vec3_scaleadd(&temp2, &zeros(), temp->GetParticleByIndex(j_Index)->A_k[k] * vec3_dot(&temp->GetParticleByIndex(j_Index)->Um_k[k], &gradient_W_ij), &temp->GetParticleByIndex(j_Index)->Um_k[k]);
-				vector3 tempsum;
-				vec3_add(&tempsum, &temp1, &temp2);
-				tempsum *= PARTICLE(i)->staticDensity;//ÒòÎª¶¼ÉèÎª¾²Ë®ÃÜ¶ÈÁË£¬Èç¹ûÕâÑùÒªÓÃÓÖÒªÔÚParticleÀï¼ÓÉÏ¶àÏàµÄ¾²Ë®ÃÜ¶ÈÕâ¸ö²ÎÊý
-				vec3_scaleadd(&gradient_T_Dm[i], &gradient_T_Dm[i], -PARTICLE(j_Index)->mass / (PARTICLE(j_Index)->density), &tempsum);//ÓëÔ­ÎÄ²»·ûµÄµØ·½£ºk-ÏàÃÜ¶ÈÏûÈ¥
+				float dist = 0.0f;
+				int Jindex = sph.n_list.p[i][j].index;//ÁÚ½Ó±íµÄÁ£×ÓË÷Òý
+				dist = sph.n_list.p[i][j].distsq;
 
-				//¹«Ê½(13)
-				PARTICLE(i)->P_k_Gradient[k] += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index), (PARTICLE(j_Index)->P_k[k] - PARTICLE(i)->P_k[k]) / PARTICLE(j_Index)->density);
-				//¹«Ê½(14)
-				PARTICLE(i)->A_k_Gradient[k] += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index), (PARTICLE(j_Index)->A_k[k] - PARTICLE(i)->A_k[k]) / PARTICLE(j_Index)->density);
+				if (h2 > dist)
+				{
+					//ÎªÁË¸üºÃµÄ¿´³ö¹«Ê½µÄ´íÎó£¬¾¡Á¿¹«Ê½ÍêÕû±íÊ¾
+					//¹«Ê½(22)
+					PARTICLE(i)->density += SPH_function(*PARTICLE(i), *PARTICLE(Jindex), 1.0f);
+
+					if (Jindex != i)
+						PARTICLE(Jindex)->density += SPH_function(*PARTICLE(Jindex), *PARTICLE(i), 1.0f);
+				}
 			}
 		}
-
-		PARTICLE(i)->P_m_Gradient = gradient_P_m[i];
-
-		PARTICLE(i)->temp_A = (zeros() - gradient_T_m[i] /*- gradient_T_Dm[i]*/)*(1.0f / PARTICLE(i)->staticDensity);
 	}
-	//string name = "P_m_Gradient" + to_string(_Frame) + ".txt";
-	//MyFileRW::getinstance()->SetWriteFileName(name);//ÕâÀïµÄP_m_GradientÓëÔ­À´¸øµÄÊÇÒ»ÑùµÄ
-	//for (size_t i = 0; i < GETNUM(); i++)
-	//{
-	//	MyFileRW::getinstance()->WriteSomething("Á£×Ó");
-	//	MyFileRW::getinstance()->WriteSomething(i);
-	//	MyFileRW::getinstance()->WriteSomething(" :", 2);
-	//	MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->density, 2);
-	//	MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->pressure, 2);
-	//	MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.x, 1);
-	//	MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.y, 1);
-	//	MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.z, 2);
-	//}
-	//MyFileRW::getinstance()->CloseWriteFile();
-}
-
-void Calculate::CalDriftVel(SPHSystem &sph)
-{
-	for (int i = 0; i < GETNUM(); i++)
+	else
 	{
-		float density_m = 0.0f;
-		vector3 sum_C_k_P_k;
-		//¹«Ê½£¨9£©
-		for (int k = 0; k < PARTICLE(i)->k_phase; k++)
+		for (int i = 0;i < GETNUM();i++)
 		{
-			vec3_scaleadd(&sum_C_k_P_k, &sum_C_k_P_k, PARTICLE(i)->C_k[k], &PARTICLE(i)->P_k_Gradient[k]);
-			density_m += PARTICLE(i)->C_k[k] * PARTICLE(i)->staticDensity;
-		}
-
-		for (int k = 0; k < PARTICLE(i)->k_phase; k++)
-		{
-			//ÎÊÒ»ÏÂÀÏÊ¦¦ÓºÍ¦ÒÈ¡ÁË¶àÉÙ
-			//ÓÒÊ½µÚÒ»Ïî
-			vec3_scaleadd(&PARTICLE(i)->Um_k[k], &PARTICLE(i)->Um_k[k], _tao * (PARTICLE(i)->staticDensity - density_m), &(PARTICLE(i)->temp_A + PARTICLE(i)->P_m_Gradient));
-			//ÓÒÊ½µÚ¶þÏî
-			vector3 tempsub;
-			vec3_sub(&tempsub, &PARTICLE(i)->P_k_Gradient[k], &sum_C_k_P_k);
-			vec3_scaleadd(&PARTICLE(i)->Um_k[k], &PARTICLE(i)->Um_k[k], sigma, &tempsub);
-			//ÔÝÎÞÓÒÊ½µÚÈýÏî
-		}
-	}
-}
-
-void Calculate::CalFraction(SPHSystem &sph)
-{
-	//Õû¸ö·½·¨Îª¹«Ê½£¨7£©
-	for (int i = 0; i < GETNUM(); i++)
-	{
-		for (int k = 0; k < PARTICLE(i)->k_phase; k++)
-		{
-			float tempresult1 = 0.0f;
-			float tempresult2 = 0.0f;
-			float tempresult3 = 0.0f;
-			for (int j = 0; j < sph.n_list.p[i].size(); j++)
+			for (int j = 0;j < sph.n_list.p[i].size();j++)
 			{
-				int j_Index = sph.n_list.p[i][j].index;
-				//ÏÈËã¹«Ê½£¨17£©£¬´Ë¹«Ê½Îªµ÷Õû¹«Ê½£¬·Çµ÷Õû¹«Ê½Îª£¨15£©
-				vector3 temp = zeros() - PARTICLE(i)->vel;
-				tempresult1 += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index),
-					PARTICLE(j_Index)->vel, temp,
-					(PARTICLE(i)->A_k[k] + PARTICLE(j_Index)->A_k[k]) / (PARTICLE(j_Index)->density * 2.0));
-				//¹«Ê½£¨18£©£¬´Ë¹«Ê½Îªµ÷Õû¹«Ê½£¬·Çµ÷Õû¹«Ê½Îª£¨16£©
-				tempresult2 += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index),
-					PARTICLE(j_Index)->Um_k[k] * PARTICLE(j_Index)->A_k[k], PARTICLE(i)->Um_k[k] * PARTICLE(i)->A_k[k],
-					1.0 / PARTICLE(j_Index)->density);
+				float dist = 0.0f;
+				int Jindex = sph.n_list.p[i][j].index;//ÁÚ½Ó±íµÄÁ£×ÓË÷Òý
+				//ÒòÎª½øÐÐÁËÒ»´Î¼ÆËã£¬ÎÒÃÇ¼ÙÉèÁÚ¾Ó»¹ÊÇÔ­À´µÄÁÚ¾Ó£¬µ«ÊÇÎ»ÖÃ·¢ÉúÁËÒ»Ð©¸Ä±ä£¬ËùÒÔ¸üÐÂÁ£×ÓµÄ¾àÀë
+				dist = vec3_distsq(&PARTICLE(i)->pos, &PARTICLE(Jindex)->pos);
+				sph.n_list.p[i][j].distsq = dist;
 
+				if (h2 > dist)
+				{
+					//ÎªÁË¸üºÃµÄ¿´³ö¹«Ê½µÄ´íÎó£¬¾¡Á¿¹«Ê½ÍêÕû±íÊ¾
+					//¹«Ê½(22)
+					PARTICLE(i)->density += SPH_function(*PARTICLE(i), *PARTICLE(Jindex), 1.0f);
+
+					if (Jindex != i)
+						PARTICLE(Jindex)->density += SPH_function(*PARTICLE(Jindex), *PARTICLE(i), 1.0f);
+				}
 			}
-			//¹«Ê½£¨7£©
-			PARTICLE(i)->A_k[k] += (tempresult2 - tempresult1)*sph.GetTimeStep();//¸üÐÂÌå»ý·ÖÊý
-
-		}//for k end
-
-		float sum_A_k = 0.0f;
-		//Ã¿Ò»Ïà¼ÆËãÍêºó,Ð£ÕýÌå»ý·ÖÊý
-		for (int k = 0; k < PARTICLE(i)->k_phase; k++)
-		{
-			if (PARTICLE(i)->A_k[k] < 0)
-				PARTICLE(i)->A_k[k] = 0;
-			sum_A_k += PARTICLE(i)->A_k[k];
 		}
-
-		//Èç¹û²»½ÃÕýÑ¹Á¦		
-		//float tempPressureChange;
-		//for (int k = 0; k < PARTICLE(i)->k_phase; k++)
-		//{
-		//	float tempak = PARTICLE(i)->A_k[k];
-		//	PARTICLE(i)->A_k[k] = PARTICLE(i)->A_k[k] / sum_A_k;
-		//	tempPressureChange += -sph.GetStiff()*PARTICLE(i)->staticDensity * (PARTICLE(i)->A_k[k] - tempak);
-		//}
-		////Ð£ÕýÑ¹Á¦
-		//PARTICLE(i)->pressure += tempPressureChange;
 	}
 
-}
-
-void Calculate::CalForce(SPHSystem &sph)
-{
-	//Õû¸ö·½·¨Îª¹«Ê½£¨8£©,Ö÷ÒªÎª¼ÆËãu_mËæÊ±¼äµÄµ¼Êý
-	vector3 G(0.0f, 0.0f, -9.8f);
-
-	//vector<vector3> tempumum_gredient;
-	//tempumum_gredient.resize(GETNUM());
-	//¼ÆËã×óÊ½µÚ¶þÏî
-	for (size_t i = 0; i < GETNUM(); i++)
-	{
-		//PARTICLE(i)->P_m_Gradient = zeros();
-		//float temp_um_gredient = 0.0f;
-		//for (int j = 0; j < sph.n_list.p[i].size(); j++)
-		//{
-			//int j_Index = sph.n_list.p[i][j].index;
-			//temp_um_gredient += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index), PARTICLE(j_Index)->vel, PARTICLE(i)->vel, 0.5);
-			//PARTICLE(i)->P_m_Gradient += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index),
-			//	((PARTICLE(i)->pressure + PARTICLE(j_Index)->pressure)
-			//		/
-			//	(2.0f * PARTICLE(j_Index)->density))
-			//);//ÒòÎª¸üÐÂÁËÑ¹Á¦ÖØÐÂ¼ÆËã£¬¹«Ê½£¨20£©
-		//}
-		//tempumum_gredient[i] = PARTICLE(i)->vel * temp_um_gredient;
-
-		//ÎªÁË²âÊÔÊýÖµÐ´µÄÁÙÊ±±äÁ¿
-		vector3 test_temp_A(PARTICLE(i)->temp_A);
-		vector3 test_P_m_Gradient(PARTICLE(i)->P_m_Gradient);
-		//¹«Ê½£¨8£©
-		//PARTICLE(i)->acc = /*G*/zeros() - tempumum_gredient[i] - test_temp_A - PARTICLE(i)->P_m_Gradient*(1.0f/PARTICLE(i)->staticDensity)/*PARTICLE(i)->temp_A*/;
-		PARTICLE(i)->acc = G - PARTICLE(i)->temp_A + PARTICLE(i)->P_m_Gradient;
-	}
-	string name = "FrameForce" + to_string(_Frame) + ".txt";
+//#define TESTPRINT
+#ifdef TESTPRINT
+	string name = "./Data/yali" + to_string(_Frame) + ".txt";
 	MyFileRW::getinstance()->SetWriteFileName(name);
+#endif	
+	//¼ÆËãÑ¹Á¦
 	for (size_t i = 0; i < GETNUM(); i++)
 	{
-		MyFileRW::getinstance()->WriteSomething("Á£×Ó");
-		MyFileRW::getinstance()->WriteSomething(i);
-		MyFileRW::getinstance()->WriteSomething(" :", 2);
+		PARTICLE(i)->pressure = sph.GetStiff()*(PARTICLE(i)->density - PARTICLE(i)->staticDensity);//¼õÈ¥¾²Ì¬ÃÜ¶È£¨1000£©
 
-		MyFileRW::getinstance()->WriteSomething("ÃÜ¶È£º", 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->density, 2);
-		MyFileRW::getinstance()->WriteSomething("Ñ¹Á¦£º", 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->pressure, 2);
+#ifdef TESTPRINT
+		string some = "Á£×Ó" + to_string(i) + ":";
+		MyFileRW::getinstance()->WriteSomething(some,2);
+		some = "ÃÜ¶È£º" + to_string(PARTICLE(i)->density);
+		MyFileRW::getinstance()->WriteSomething(some, 2);
+		some = "Ñ¹Á¦£º" + to_string(PARTICLE(i)->pressure);
+		MyFileRW::getinstance()->WriteSomething(some, 2);
+#endif	
+	}
+#ifdef TESTPRINT
+	MyFileRW::getinstance()->CloseWriteFile();
+#endif
 
-		MyFileRW::getinstance()->WriteSomething("¼ÓËÙ¶È£º", 1);
+}
+
+void Calculate_Reverce::CalDriftVel(SPHNewSystem &sph)
+{
+}
+
+void Calculate_Reverce::CalFraction(SPHNewSystem &sph)
+{
+
+}
+
+void Calculate_Reverce::CalForce(SPHNewSystem &sph)
+{
+	//Çå¿Õ¼ÓËÙ¶È£¬ÖØÐÂ¼ÆËã
+	for (int i = 0;i < GETNUM();i++)
+	{
+		PARTICLE(i)->acc = zeros();
+	}
+	float h = sph.GetH();
+	for (int i = 0;i < GETNUM();i++)
+	{
+		for (int j = 1;j < sph.n_list.p[i].size();j++)
+		{
+			int Jindex = sph.n_list.p[i][j].index;//ÁÚ½Ó±íµÄÁ£×ÓË÷Òý
+			vector3 posdiff = PARTICLE(i)->pos - PARTICLE(Jindex)->pos;
+			float r = sqrtf(vec3_dot(&posdiff, &posdiff));
+			//Ñ¹Á¦Ó°Ïì
+
+						//¹«Ê½£¨20£©£¬²¢¸ù¾Ý¹«Ê½£¨8£©¶à³ýÒÔ»ìºÏÃÜ¶È£¨¶ÔÓÚµ¥Ïà£¬»ìºÏÃÜ¶ÈÎª Á£×ÓiµÄÃÜ¶È£©
+			vector3 tempPacc;
+			tempPacc = posdiff / r * (PARTICLE(i)->pressure + PARTICLE(Jindex)->pressure) / (2.0f*PARTICLE(i)->density*PARTICLE(Jindex)->density) * -grad_spiky_coef* (h - r)*(h - r);
+
+			//Ò»´Î¼ÆËã
+			PARTICLE(i)->acc += tempPacc * PARTICLE(Jindex)->mass;
+			PARTICLE(Jindex)->acc -= tempPacc * PARTICLE(i)->mass;
+
+
+			//Õ³¶ÈÓ°Ïì
+			vector3 veldiff = PARTICLE(Jindex)->vel - PARTICLE(i)->vel;//ËÙ¶È²î
+			vector3 tempVisacc;
+#define SINGCAL
+#ifdef SINGCAL
+			//Ê¹ÓÃ2½×ÌÝ¶È
+			tempVisacc = veldiff / (PARTICLE(i)->density * PARTICLE(Jindex)->density)* PARTICLE(Jindex)->m_Viscosity  * lap_vis_coef*(h - r);
+#else
+			//¹«Ê½£¨21£©£¬Í¬Àí³ýÒÔ»ìºÏÃÜ¶È
+			tempVisacc = veldiff * ((PARTICLE(Jindex)->m_Viscosity + PARTICLE(i)->m_Viscosity) / (PARTICLE(i)->density*PARTICLE(Jindex)->density)) *  -grad_spiky_coef* (h - r)*(h - r) / r;
+#endif
+			//Ò»´Î¼ÆËã
+			PARTICLE(i)->acc += tempVisacc * PARTICLE(Jindex)->mass;
+			PARTICLE(Jindex)->acc -= tempVisacc * PARTICLE(i)->mass;
+		}
+	}
+//#define TESTPRINT
+#ifdef TESTPRINT
+	string name = "./Data/Force" + to_string(_Frame) + ".txt";
+	MyFileRW::getinstance()->SetWriteFileName(name);
+	for (int i = 0;i < GETNUM();i++)
+	{
+		string some;
+		some = "Á£×Ó" + to_string(i) + ":";
+		MyFileRW::getinstance()->WriteSomething(some, 2);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.x, 1);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.y, 1);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.z, 2);
-
-		MyFileRW::getinstance()->WriteSomething("Ñ¹Á¦Ó°Ïì£º", 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.x, 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.y, 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->P_m_Gradient.z, 2);
-
-		MyFileRW::getinstance()->WriteSomething("Õ³¶ÈÓ°Ïì£º", 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->temp_A.x, 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->temp_A.y, 1);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->temp_A.z, 2);
 	}
 	MyFileRW::getinstance()->CloseWriteFile();
+#endif
 }
-void Calculate::compute_col(vector3* col,
+void Calculate_Reverce::compute_col(vector3* col,
 	const vector3* vel, const vector3* n,
 	float diff, float stiff, float damp)
 {
@@ -412,7 +364,7 @@ void Calculate::compute_col(vector3* col,
 	vec3_scaleadd(col, col, reverse, n);
 }
 
-void Calculate::glass_collision(vector3* p, vector3* col, const vector3* vel,//Ä£ÄâºÍ²£Á§±­Åö×²    
+void Calculate_Reverce::glass_collision(vector3* p, vector3* col, const vector3* vel,//Ä£ÄâºÍ²£Á§±­Åö×²    
 	const matrix4* mat, const matrix4* mat_inv,
 	float radius, float stiff, float damp)
 {
@@ -448,59 +400,64 @@ void Calculate::glass_collision(vector3* p, vector3* col, const vector3* vel,//Ä
 }
 
 
-void Calculate::CalCollision(SPHSystem &sph)
+void Calculate_Reverce::CalCollision(SPHNewSystem &sph)
 {
 	float sphere_radius = 0.004f;
 	float stiff = 30000.0f;
 	float damp = 128.0f;
-	//MyFileRW::getinstance()->SetWriteFileName("col.txt");
-	//string w = "This is NO."+ to_string(_Frame);	
-	//MyFileRW::getinstance()->WriteSomething(w,2);
+//#define PRINTCOLL
+#ifdef PRINTCOLL
+	string name = "./Data/collision" + to_string(_Frame - 1) + ".txt";
+	MyFileRW::getinstance()->SetWriteFileName(name);
+#endif	
 	for (int i = 0; i < GETNUM(); i++)
 	{
 		vector3 pre_p; /** Ô¤²âÎ»ÖÃ **/
 		vector3 col;
-		vec3_set(&pre_p, 0, 0, 0);
-		vec3_set(&col, 0, 0, 0);
-		pre_p += PARTICLE(i)->pos + PARTICLE(i)->vel_half * sph.GetTimeStep();
+
+		pre_p = PARTICLE(i)->pos + PARTICLE(i)->vel_half * sph.GetTimeStep();
 		glass_collision(&pre_p, &col, &PARTICLE(i)->vel, &sph.mat_col, &sph.mat_inv_col, sphere_radius, stiff, damp);
 		PARTICLE(i)->acc += col;
-
-		//MyFileRW::getinstance()->WriteSomething("Á£×Ó", 1);
-		//MyFileRW::getinstance()->WriteSomething(i, 1);
-		//MyFileRW::getinstance()->WriteSomething(":", 2);
-		//MyFileRW::getinstance()->WriteFloat(col.x, 1);
-		//MyFileRW::getinstance()->WriteFloat(col.y, 1);
-		//MyFileRW::getinstance()->WriteFloat(col.z, 2);
+#ifdef PRINTCOLL
+		string some = "Á£×Ó" + to_string(i)+":";
+		MyFileRW::getinstance()->WriteSomething(some, 2);
+		some = "Åö×²ÒýÆðµÄ¼ÓËÙ¶È:"+to_string(col.x)+" " + to_string(col.y)+" " + to_string(col.z);
+		MyFileRW::getinstance()->WriteSomething(some, 2);
+#endif
 	}
-	//MyFileRW::getinstance()->CloseWriteFile();
+
+#ifdef PRINTCOLL
+	MyFileRW::getinstance()->CloseWriteFile();
+#endif	
 }
 
 
 
-void Calculate::CalPosition(SPHSystem &sph)
+void Calculate_Reverce::CalPosition(SPHNewSystem &sph)
 {
-#define PRINTSOME
+//#define PRINTSOME
 #ifdef PRINTSOME
-	string name = "finalacc" + to_string(_Frame) + ".txt";
+	string name = "./Data/finalacc" + to_string(_Frame-1) + ".txt";
 	MyFileRW::getinstance()->SetWriteFileName(name);
 #endif
+	vector3 G(0.0f, 0.0f, -9.8f);
 	for (int i = 0; i < GETNUM(); i++)
 	{
 		vector3 v_half;
-
+		PARTICLE(i)->acc += G;
 		v_half = PARTICLE(i)->vel_half + PARTICLE(i)->acc * sph.GetTimeStep();
 		vector3 ShowOneStepDistance = v_half*sph.GetTimeStep();
 		PARTICLE(i)->pos += ShowOneStepDistance;
 #ifdef PRINTSOME
 		MyFileRW::getinstance()->WriteSomething("Á£×Ó");
 		MyFileRW::getinstance()->WriteSomething(i, 1);
-		MyFileRW::getinstance()->WriteSomething(":",2);
+		MyFileRW::getinstance()->WriteSomething(":", 2);
+		MyFileRW::getinstance()->WriteSomething("¼ÓËÙ¶È £º ");
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.x, 1);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.y, 1);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.z, 2);
 		string positioninformation = "Î»ÖÃ:" + to_string((float)PARTICLE(i)->pos.x) + "  " + to_string((float)PARTICLE(i)->pos.y) + "  " + to_string((float)PARTICLE(i)->pos.z);
-		MyFileRW::getinstance()->WriteSomething(positioninformation,2);
+		MyFileRW::getinstance()->WriteSomething(positioninformation, 2);
 #endif 
 		PARTICLE(i)->vel = (PARTICLE(i)->vel + PARTICLE(i)->vel_half)*0.5;
 		PARTICLE(i)->vel_half = v_half;
@@ -510,7 +467,7 @@ void Calculate::CalPosition(SPHSystem &sph)
 #endif 
 }
 
-void Calculate::setH(float temph)
+void Calculate_Reverce::setH(float temph)
 {
 	h = temph;
 	poly6_coef = 315.0f / (64.0f*PI*(float)pow(h, 9));
@@ -520,21 +477,13 @@ void Calculate::setH(float temph)
 	lap_vis_coef = 45.0f / (PI*h*h*h*h*h*h);
 }
 
-vector3 Calculate::SPH_function(Particle i, Particle j, vector3 jfunc, vector3 ifunc /*= zeros()*/)
-{
-	return zeros();//ºÃÏñÔÝÊ±ÓÃ²»µ½
-}
-
-float Calculate::SPH_function(Particle i, Particle j, float jfunc, float ifunc /*= 0.0f*/)
+float Calculate_Reverce::SPH_function(Particle i, Particle j, float jfunc, float ifunc /*= 0.0f*/)
 {
 	float h_2 = h * h;
 	vector3 temp;
 	vec3_set(&temp, 0.0f, 0.0f, 0.0f);
 	vec3_sub(&temp, &i.pos, &j.pos);
-	//if (temp == zeros())
-	//{
-	//	return 0.0f;
-	//}
+
 	float r_2 = vec3_dot(&temp, &temp);
 
 	float _result = j.mass * poly6_coef * (h_2 - r_2) * (h_2 - r_2) * (h_2 - r_2);
@@ -543,7 +492,7 @@ float Calculate::SPH_function(Particle i, Particle j, float jfunc, float ifunc /
 	return _result;
 }
 
-vector3 Calculate::SPH_function_gradient(Particle i, Particle j, float jfunc, float ifunc)
+vector3 Calculate_Reverce::SPH_function_gradient(Particle i, Particle j, float jfunc, float ifunc)
 {
 	vector3 temp;
 	vec3_set(&temp, 0.0f, 0.0f, 0.0f);
@@ -560,7 +509,7 @@ vector3 Calculate::SPH_function_gradient(Particle i, Particle j, float jfunc, fl
 	return _result;
 }
 
-float Calculate::SPH_function_gradient(Particle i, Particle j, vector3 jfunc, vector3 ifunc /*= zeros()*/, float Adjustment /*= 1.0f*/)
+float Calculate_Reverce::SPH_function_gradient(Particle i, Particle j, vector3 jfunc, vector3 ifunc /*= zeros()*/, float Adjustment /*= 1.0f*/)
 {
 	vector3 dist;
 	vec3_set(&dist, 0.0f, 0.0f, 0.0f);
@@ -574,7 +523,7 @@ float Calculate::SPH_function_gradient(Particle i, Particle j, vector3 jfunc, ve
 	return _result;
 }
 
-vector3 Calculate::SPH_function_gradient_2(Particle i, Particle j, vector3 jfunc, vector3 ifunc /*= zeros()*/, float Adjustment /*= 1.0f*/)
+vector3 Calculate_Reverce::SPH_function_gradient_2(Particle i, Particle j, vector3 jfunc, vector3 ifunc /*= zeros()*/, float Adjustment /*= 1.0f*/)
 {
 	vector3 dist;
 	vec3_set(&dist, 0.0f, 0.0f, 0.0f);
@@ -587,79 +536,4 @@ vector3 Calculate::SPH_function_gradient_2(Particle i, Particle j, vector3 jfunc
 	float r = sqrtf(vec3_dot(&dist, &dist));
 	_result = (jfunc + ifunc) * j.mass * lap_vis_coef * (h - r) * Adjustment;
 	return _result;
-}
-
-void SingleCal::CalPressure(SPHSystem &sph)
-{
-	Fluid *temp = sph.GetFluid();
-	if (!temp)
-	{
-		cout << "CalPressure Fluid is NULL." << endl;
-		return;
-	}
-	for (int i = 0; i < temp->GetParticleNum(); i++)
-	{
-		float density = 0.0f;
-		for (int j = 0; j < sph.n_list.p[i].size(); j++)
-		{
-			int j_Index = sph.n_list.p[i][j].index;
-			//¼ÆËãÃÜ¶È¹«Ê½(22)
-			density += SPH_function(*temp->GetParticleByIndex(i), *temp->GetParticleByIndex(j_Index), 1.0);
-		}
-		PARTICLE(i)->density = density;//»ñµÃÃ¿¸öÁ£×ÓµÄÃÜ¶ÈÆ½¾ù
-
-		temp->GetParticleByIndex(i)->pressure = sph.GetStiff()*(temp->GetParticleByIndex(i)->density - PARTICLE(i)->staticDensity);
-	}
-#define PIRNTTEST
-#ifdef PIRNTTEST
-	string name = "density" + to_string(_Frame) + ".txt";
-	MyFileRW::getinstance()->SetWriteFileName(name);
-	for (int i = 0; i < temp->GetParticleNum(); i++)
-	{
-		MyFileRW::getinstance()->WriteSomething("Á£×Ó");
-		MyFileRW::getinstance()->WriteSomething(i);
-		MyFileRW::getinstance()->WriteSomething(":", 1);
-		MyFileRW::getinstance()->WriteSomething(PARTICLE(i)->density, 2);
-	}
-	MyFileRW::getinstance()->CloseWriteFile();
-#endif
-}
-
-void SingleCal::CalForce(SPHSystem &sph)
-{
-	vector3 G(0.0f, 0.0f, -9.8f);
-	Fluid *temp = sph.GetFluid();
-#ifdef PIRNTTEST
-	string name = "singleacc" + to_string(_Frame) + ".txt";
-	MyFileRW::getinstance()->SetWriteFileName(name);
-#endif
-	for (int i = 0; i < temp->GetParticleNum(); i++)
-	{
-		vector3 pressureforce;
-		vector3 viscosityforce;
-		for (int j = 0; j < sph.n_list.p[i].size(); j++)
-		{
-			int j_Index = sph.n_list.p[i][j].index;
-			//¼ÆËãÑ¹Á¦
-			pressureforce += SPH_function_gradient(*PARTICLE(i), *PARTICLE(j_Index),
-				(PARTICLE(i)->pressure + PARTICLE(j_Index)->pressure) / (2.0f*PARTICLE(j_Index)->density * PARTICLE(i)->density)
-			);
-
-			vector3 vel_diff = PARTICLE(j_Index)->vel - PARTICLE(i)->vel;
-			viscosityforce += SPH_function_gradient_2(*PARTICLE(i), *PARTICLE(j_Index), vel_diff, zeros(),
-				PARTICLE(j_Index)->m_Viscosity / (PARTICLE(j_Index)->density*PARTICLE(i)->density));
-		}
-		PARTICLE(i)->acc = G + pressureforce + viscosityforce;
-#ifdef PIRNTTEST
-		string something = "Á£×Ó" + to_string(i) + ":";
-		MyFileRW::getinstance()->WriteSomething(something, 2);
-		something = "Ñ¹Á¦¼ÓËÙ¶È£º" + to_string((float)pressureforce.x)+"  "+to_string((float)pressureforce.y)+"  "+to_string((float)pressureforce.z);
-		MyFileRW::getinstance()->WriteSomething(something, 2);
-		something = "Õ³¶È¼ÓËÙ¶È£º" + to_string((float)viscosityforce.x) + "  " + to_string((float)viscosityforce.y) + "  " + to_string((float)viscosityforce.z);;
-		MyFileRW::getinstance()->WriteSomething(something, 2);
-#endif
-	}
-#ifdef PIRNTTEST
-	MyFileRW::getinstance()->CloseWriteFile();
-#endif
 }

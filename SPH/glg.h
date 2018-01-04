@@ -51,6 +51,14 @@ struct vector3
 		this->z += add2.z;
 		return *this;
 	}
+	vector3& operator-=(vector3 add2)
+	{
+		this->x -= add2.x;
+		this->y -= add2.y;
+		this->z -= add2.z;
+		return *this;
+	}
+
 	bool operator == (vector3 add2)
 	{
 		return (this->x == add2.x) && (this->y == add2.y) && (this->z == add2.z);
@@ -96,6 +104,15 @@ struct vector3
 		dst.z = this->z * add2;
 		return dst;
 	}
+	vector3 operator / (float add2)
+	{
+		vector3 dst;
+		dst.x = this->x / add2;
+		dst.y = this->y / add2;
+		dst.z = this->z / add2;
+		return dst;
+	}
+
 	vector3 operator *= (float add2)
 	{
 		this->x *= add2;

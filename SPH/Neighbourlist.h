@@ -20,10 +20,10 @@ public:
 	Grid();
 	~Grid();
 	void SetGrid_len(float len) { grid_len = len; };//设定网格长度需要在CreateGrid之前
-	void CreateGrid(const Fluid input);
+	void CreateGrid(const Fluid input, bool IstrueToCreate = false);
 	
 
-	vector<vector<int>> particles; /** particles indexed by grid **/
+	vector<vector<int>> particles;//particles[i][j]表示第i个网格中第j个粒子的索引
 	//vector<int> sizes;      /** number of particles grid has **/
 	vector<int> caps;       /** capacity of each grid **/
 	int capacity;

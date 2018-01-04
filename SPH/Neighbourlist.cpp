@@ -11,7 +11,7 @@ Grid::~Grid()
 {
 }
 
-void Grid::CreateGrid(Fluid input)
+void Grid::CreateGrid(Fluid input,bool IstrueToCreate)
 {
 	float fmin_x;
 	float fmax_x;
@@ -57,7 +57,7 @@ void Grid::CreateGrid(Fluid input)
 	}
 	particles.clear();
 	particles.resize(width*height*depth);
-
+	if (IstrueToCreate)
 	//把粒子添加到网格中
 	for (int i = 0; i < input.GetParticleNum(); i++)
 	{
@@ -76,7 +76,7 @@ void Grid::CreateGrid(Fluid input)
 		if (particles[gindex].size() > 100)
 			std::cout << "Warm:Grid No." << gindex << " 's particles is over 100." << std::endl;
 
-		particles[gindex].push_back(i);//particles[i][j]表示第i个网格中第j个粒子的索引
+		particles[gindex].push_back(i);
 	}
 }
 

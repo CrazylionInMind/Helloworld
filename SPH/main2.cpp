@@ -19,24 +19,6 @@
 #include "MyfileRW.h"
 using namespace std;
 GLUquadricObj *quadratic;
-#define NUM_PHASE 2
-
-#define SMOOTHING_LENGTH 0.01f    
-#define SEARCH_RADIUS (1*SMOOTHING_LENGTH)    
-#define N_LOOPS 2   
-#define CUBE_LEN_X 10    
-#define CUBE_LEN_Y 10    
-#define LEN_Z 20
-#define N_PARTICLES (CUBE_LEN_X*CUBE_LEN_Y*LEN_Z)    
-#define EPSILON 0.0001f    
-#define VISCOSITY 0.5f//0.2f    
-#define STIFF 1.5f    
-#define MASS 0.00020543f    
-#define RANDF() ((rand()/(GLfloat)RAND_MAX - 0.5f))
-#define ISO_RADUIS 0.0115f
-#define MC_GRID_LEN (0.5*SMOOTHING_LENGTH)
-#define TIMESTEP 0.005f
-#define STATICDENSITY 1000.0f//静水密度
 
 //#define FILEINPUT
 //光照
@@ -80,81 +62,12 @@ void init_obstacles()
 	matrix4 m;
 	vec3_set(&tmp, 0.0f, 0.0f, -0.0f);//tmp3个分量全部赋值0    
 	mat4_set_translate(&m, tmp.x, tmp.y, tmp.z);
-	cpu_sph_transform_obstacles(SPHSystem::getinstance(), &m);
+	cpu_sph_transform_obstacles(SPHNewSystem::getinstance(), &m);
 }
 
 void init_particles()
 {
-	int i;
-	int x;
-	int y;
-	int z;
-	GLfloat s;
-	GLfloat s2;
-	GLfloat cx;
-	GLfloat cy;
-	GLfloat cz;
-
-	s = 0.006f;
-	cx = cy = 0.0f;
-	cz = 0.05f;
-
-	s2 = 0.001f;
-	//初始化流体,流体中N_PARTICLES个粒子，粒子有NUM_PHASE相
-
-	//保留功能的时候，这里记得释放空间，暂时还没有释放空间
-	Fluid *input = new Fluid(N_PARTICLES, NUM_PHASE);
-
-#ifdef FILEINPUT
-	//test io
-	MyFileRW::getinstance()->SetReadNmae("input.txt");//SetName和close要成对出现
-	MyFileRW::getinstance()->ReadFile(input);
-	MyFileRW::getinstance()->CloseReadFile();
-#else
-	for (x = 0; x < CUBE_LEN_X; x++)
-	{
-		for (y = 0; y < CUBE_LEN_Y; y++)
-		{
-			for (z = 0; z < LEN_Z; z++)
-			{
-				i = x + y*CUBE_LEN_X + z*CUBE_LEN_X*CUBE_LEN_Y;
-				if (input->m_ParticleVector.size() < i)
-					continue;
-				//设置位置
-				//vec3_set(&(input->GetParticleByIndex(i)->pos), s*(x - CUBE_LEN_X / 2) - cx, s*(y - CUBE_LEN_Y / 2) - cy, 0.8*s*z - cz + 0.1f);
-				vec3_set(&(input->GetParticleByIndex(i)->pos), s*(x - CUBE_LEN_X / 2) - cx, s*(y - CUBE_LEN_Y / 2) - cy, s*z - cz);
-				//设置速度
-				vec3_set(&(input->GetParticleByIndex(i)->vel), 0.0f, 0.0f, 0.0f);
-				input->GetParticleByIndex(i)->vel_half = input->GetParticleByIndex(i)->vel;
-				input->GetParticleByIndex(i)->SetstaticDensity(STATICDENSITY);
-				//以x轴为分界，x取正为红色，x取负为蓝色
-				if (x >= CUBE_LEN_X / 2)
-				{
-					//设置体积分数
-					input->GetParticleByIndex(i)->A_k[0] = (1.0f);//设立体积分数，第一项为1
-					input->GetParticleByIndex(i)->A_k[1] = (0.0f);//第二项为0
-					//设置质量分数
-					input->GetParticleByIndex(i)->C_k[0] = (1.0f);//设立体积分数，第一项为1
-					input->GetParticleByIndex(i)->C_k[1] = (0.0f);//第二项为0
-				}
-				else
-				{
-					input->GetParticleByIndex(i)->A_k[0] = (0.0f);//设立体积分数，第一项为0
-					input->GetParticleByIndex(i)->A_k[1] = (1.0f);//第二项为1
-
-					input->GetParticleByIndex(i)->C_k[0] = (0.0f);//设立体积分数，第一项为0
-					input->GetParticleByIndex(i)->C_k[1] = (1.0f);//第二项为1
-				}
-				//设置每个粒子的质量
-				input->GetParticleByIndex(i)->SetMass(MASS);
-				//设置粘度
-				input->GetParticleByIndex(i)->SetViscosity(VISCOSITY);
-			}
-		}
-	}
-#endif
-	SPHSystem::getinstance()->SetFluid(input);
-	SPHSystem::getinstance()->SetParam(SMOOTHING_LENGTH, TIMESTEP, STIFF, SEARCH_RADIUS);
+	SPHNewSystem::getinstance()->init();
 	iCurFrame = 0;
 }
 
@@ -211,7 +124,7 @@ void color_by_power(float p)
 
 void render_fluid()
 {
-	Fluid *temp = SPHSystem::getinstance()->GetFluid();
+	Fluid *temp = SPHNewSystem::getinstance()->GetFluid();
 	if (!temp)
 		return;
 	glPointSize(6.0);//以像素点为单位   
@@ -249,15 +162,14 @@ void display(void)
 	if (cal || bStepOne)
 	{
 		//cpu_sph_elapse(&cpu, 0.0008f, iCurFrame);
-		//SPHSystem::getinstance()->CalSphOneStep();
-		SPHSystem::getinstance()->CalSphforsinglemodel();
+		SPHNewSystem::getinstance()->CalSphOneStep();
 		iCurFrame++;
 		if (!cal) bStepOne = FALSE;
 
 #ifdef FILEINPUT
 		MyFileRW::getinstance()->SetWriteFileName("output.txt");
 
-		Fluid *tempfluid = SPHSystem::getinstance()->GetFluid();
+		Fluid *tempfluid = SPHNewSystem::getinstance()->GetFluid();
 		if(tempfluid)
 			for (int i = 0; i < tempfluid->GetParticleNum(); i++)
 			{

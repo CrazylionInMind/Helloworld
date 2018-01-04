@@ -59,8 +59,6 @@
     <ClCompile Include="cpu_sph.cpp" />
     <ClCompile Include="Fluid.cpp" />
     <ClCompile Include="glg.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="main1.cpp" />
     <ClCompile Include="main2.cpp" />
     <ClCompile Include="Marching_Cube.cpp" />
     <ClCompile Include="MyfileRW.cpp" />
@@ -76,6 +74,7 @@
     <ClInclude Include="Marching_Cube.h" />
     <ClInclude Include="MyfileRW.h" />
     <ClInclude Include="Neighbourlist.h" />
+    <ClInclude Include="Param.h" />
     <ClInclude Include="Single.h" />
     <ClInclude Include="SPHSystem.h" />
     <ClInclude Include="sph_common.h" />

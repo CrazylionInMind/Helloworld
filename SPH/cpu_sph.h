@@ -76,7 +76,7 @@ void cpu_sph_create(cpu_sph* sph,//创建
  
 void cpu_sph_elapse(cpu_sph* sph, float t,int Frame);//模拟 
 void cpu_sph_transform_obstacles(cpu_sph* sph, const matrix4* m);//移动玻璃杯 
-void cpu_sph_transform_obstacles(SPHSystem * sph, const matrix4* m);
+void cpu_sph_transform_obstacles(SPHNewSystem * sph, const matrix4* m);
 void cpu_sph_get_pos(cpu_sph* sph, vector3* pos);//获取流体位置 
 void mult_create(cpu_sph* sph, int n,float *a_k);
 #endif
