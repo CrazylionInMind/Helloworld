@@ -271,11 +271,12 @@ void Calculate_Reverce::CalPressure(SPHNewSystem &sph, int whattime)
 		PARTICLE(i)->pressure = sph.GetStiff()*(PARTICLE(i)->density - PARTICLE(i)->staticDensity);//减去静态密度（1000）
 
 #ifdef TESTPRINT
-		string some = "粒子" + to_string(i) + ":";
-		MyFileRW::getinstance()->WriteSomething(some,2);
-		some = "密度：" + to_string(PARTICLE(i)->density);
+		string some;
+		some = "粒子" + to_string(i) + ":";
 		MyFileRW::getinstance()->WriteSomething(some, 2);
-		some = "压力：" + to_string(PARTICLE(i)->pressure);
+		some = "密度:" + to_string(PARTICLE(i)->density);
+		MyFileRW::getinstance()->WriteSomething(some, 2);
+		some = "压力:" + to_string(PARTICLE(i)->pressure);
 		MyFileRW::getinstance()->WriteSomething(some, 2);
 #endif	
 	}
@@ -311,7 +312,7 @@ void Calculate_Reverce::CalForce(SPHNewSystem &sph)
 			float r = sqrtf(vec3_dot(&posdiff, &posdiff));
 			//压力影响
 
-						//公式（20），并根据公式（8）多除以混合密度（对于单相，混合密度为 粒子i的密度）
+			//公式（20），并根据公式（8）多除以混合密度（对于单相，混合密度为 粒子i的密度）
 			vector3 tempPacc;
 			tempPacc = posdiff / r * (PARTICLE(i)->pressure + PARTICLE(Jindex)->pressure) / (2.0f*PARTICLE(i)->density*PARTICLE(Jindex)->density) * -grad_spiky_coef* (h - r)*(h - r);
 
@@ -345,7 +346,7 @@ void Calculate_Reverce::CalForce(SPHNewSystem &sph)
 		string some;
 		some = "粒子" + to_string(i) + ":";
 		MyFileRW::getinstance()->WriteSomething(some, 2);
-		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.x, 1);
+		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.x, 2);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.y, 1);
 		MyFileRW::getinstance()->WriteFloat(PARTICLE(i)->acc.z, 2);
 	}
@@ -459,7 +460,7 @@ void Calculate_Reverce::CalPosition(SPHNewSystem &sph)
 		string positioninformation = "位置:" + to_string((float)PARTICLE(i)->pos.x) + "  " + to_string((float)PARTICLE(i)->pos.y) + "  " + to_string((float)PARTICLE(i)->pos.z);
 		MyFileRW::getinstance()->WriteSomething(positioninformation, 2);
 #endif 
-		PARTICLE(i)->vel = (PARTICLE(i)->vel + PARTICLE(i)->vel_half)*0.5;
+		PARTICLE(i)->vel = (PARTICLE(i)->vel + v_half)*0.5;//有点问题
 		PARTICLE(i)->vel_half = v_half;
 	}
 #ifdef PRINTSOME
